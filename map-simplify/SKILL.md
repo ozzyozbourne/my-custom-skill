@@ -71,6 +71,8 @@ context compaction and nothing leaks into the working tree:
 
 - `scope.txt` — in-scope files, and the exclusion list with reasons
 - `chunks.json` — chunks: id, purpose, files, line count
+- `clones.json` — clone pairs, split into within-chunk (per chunk) and
+  cross-chunk
 - `cards/<chunk-id>.md` — one card per chunk
 - `findings/<chunk-id>.json` — deduped map findings
 - `findings/reduce.json` — cross-chunk findings
@@ -114,6 +116,20 @@ splits related ones.
   chunk. Shared utilities used everywhere form their own chunk(s).
 - Every in-scope file lands in exactly one chunk. Give each a one-line purpose.
 
+Then run the **clone detector once over all in-scope files** — never per
+chunk, since the most valuable clones span chunks. If one is available or
+installable without touching the repo (e.g. `npx jscpd <dirs> --min-tokens 60
+--reporters json --output <run dir>/jscpd`, ignoring excluded paths), map each
+clone pair's two sides to their chunks and split the results in
+`clones.json`:
+
+- **Within-chunk pairs** (both sides in the same chunk) → that chunk's
+  Simplification agent in Step 3.
+- **Cross-chunk pairs** → the Reuse agent in Step 4.
+
+If no detector can run, record that; Step 7 reports it as an angle that did
+not run.
+
 Show the user the chunk list with the estimated agent count (2 per chunk + the
 reduce agents) and use **AskUserQuestion** to confirm: run all, run a pilot
 chunk first, or adjust the split.
@@ -128,8 +144,9 @@ the user approved the split and the run size.
 Process chunks in waves of no more than ~8–10 concurrent agents (about 4–5
 chunks per wave), finishing a wave before starting the next, until every chunk
 is done. For each chunk launch **2 agents** — Simplification and Efficiency —
-giving each the chunk's file list, its purpose, and the repo map. Both read
-every line of the chunk.
+giving each the chunk's file list, its purpose, and the repo map, and giving
+the Simplification agent that chunk's within-chunk clone pairs from
+`clones.json`. Both read every line of the chunk.
 
 Each agent returns findings as `file`, `line`, one-line `summary`, and the
 concrete cost (what is wasted or harder to maintain). The Simplification agent
@@ -139,7 +156,10 @@ also writes the **chunk card** (below).
 
 Flag unnecessary complexity within the chunk: redundant or derivable state,
 copy-paste with slight variation, deep nesting, needless indirection. Name the
-simpler form that does the same job. Dead code may only be flagged after
+simpler form that does the same job. Confirm each within-chunk clone pair
+you were given by reading both sides, and report the real ones as
+copy-paste findings; the detector only sees exact token matches, so keep
+looking for near-copies it missed. Dead code may only be flagged after
 Grepping the whole repo for every reference, including dynamic ones (string
 names, reflection, config, routes, generated call sites, native-side callers
 of channel methods). If reachability cannot be proven, do not flag it.
@@ -187,10 +207,8 @@ codebase.
 
 #### Reuse
 
-1. If a clone detector is available or installable without touching the repo
-   (e.g. `npx jscpd` with output to the run directory), run it first over the
-   in-scope files and hand the agent the clone pairs that cross chunk
-   boundaries.
+1. Hand the agent the cross-chunk clone pairs from `clones.json` (Step 2).
+   It confirms each by reading both sides.
 2. From the combined **Helper inventory** sections, find helpers that do the
    same job in different chunks, and Grep for inline re-implementations of
    helpers that already exist.

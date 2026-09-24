@@ -7,10 +7,13 @@ Custom [Claude Code](https://claude.com/claude-code) skills.
 Map-reduce quality cleanup for large codebases. It splits the repo into
 cohesive chunks built from the import graph, then:
 
+- **Clone detection**: one run of a clone detector (jscpd) over all the code,
+  split into copies within a chunk and copies across chunks.
 - **Map**: two agents per chunk (Simplification and Efficiency) review every
-  line and write a compact chunk card.
+  line and write a compact chunk card. Simplification also confirms that
+  chunk's within-chunk clones.
 - **Reduce**: two agents (Reuse and Altitude) read all the cards together,
-  plus clone-detector results, to find cross-chunk duplication and missing
+  plus the cross-chunk clones, to find cross-chunk duplication and missing
   abstractions.
 
 Findings are merged into one plan. Nothing is applied until you approve it,
