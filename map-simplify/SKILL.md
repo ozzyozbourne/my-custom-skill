@@ -14,8 +14,8 @@ when_to_use: >
   Use when the user wants a codebase-wide simplification of a repo too large for
   one review wave (roughly 50k+ hand-written lines) — "map-simplify", "simplify
   this huge repo", "chunked cleanup", "find duplication across the whole
-  codebase". For smaller repos prefer /full-simplify; for a diff, PR, or
-  uncommitted work use /simplify.
+  codebase". Small repos get a cheaper single-wave mode (offered in Step 2);
+  for a diff, PR, or uncommitted work a diff-scoped cleanup is far cheaper.
 argument-hint: "[<path or module to scope to>]"
 arguments:
   - target
@@ -25,10 +25,11 @@ arguments:
 
 You are improving the quality of a large codebase, not hunting for bugs. Find
 duplication, accidental complexity, wasted work, and bandaid-depth fixes, then
-fix what the user approves. Do not look for correctness bugs — that is what
-`/code-review` is for.
+fix what the user approves. Do not look for correctness bugs — that belongs to
+a separate correctness review.
 
-This is `/full-simplify` as map-reduce:
+This is a four-angle cleanup (Reuse, Simplification, Efficiency, Altitude)
+scaled to a whole large repo as map-reduce:
 
 - **Map (inner loop)** — the code is split into chunks small enough for an
   agent to read in full. Chunks are processed in waves; two agents review each
@@ -93,8 +94,15 @@ context compaction and nothing leaks into the working tree:
   intended architecture and any rules about what must not be touched.
 - Count hand-written lines per language and per top-level directory.
 
-If the in-scope code is under ~40 files and small enough for one wave, stop
-and tell the user `/full-simplify` fits better.
+If the in-scope code is small enough for a single wave (roughly under ~40
+files or ~10k lines), tell the user map-reduce is overkill and offer
+**single-wave mode** as an option in Step 2's confirmation: skip chunking,
+cards, the clone split, and Step 4; in Step 3 launch **4 agents** over the
+whole scope at once — Simplification and Efficiency as written, plus Reuse
+and Altitude using their Step 4 instructions against the code itself (Grep
+for existing helpers and duplicated logic instead of reading cards) — then
+continue with Steps 5–7. If they invoked `/map-simplify` by name, keep the
+full map-reduce as the default.
 
 **Success criteria**: `scope.txt` written; the user is told the hand-written
 line count and exactly what was excluded and why.
@@ -132,7 +140,8 @@ not run.
 
 Show the user the chunk list with the estimated agent count (2 per chunk + the
 reduce agents) and use **AskUserQuestion** to confirm: run all, run a pilot
-chunk first, or adjust the split.
+chunk first, or adjust the split (plus "single-wave mode" when Step 1 found
+the repo small).
 
 **Success criteria**: `chunks.json` covers every in-scope file exactly once;
 the user approved the split and the run size.
@@ -291,7 +300,7 @@ Summarize:
   and angles that could not run (e.g. no clone detector). An unreviewed area
   must never read as clean.
 - Correctness bugs noticed in passing, listed but not fixed — point the user
-  at `/code-review`.
+  at a separate correctness review.
 
 **Success criteria**: The user can tell exactly what changed, what didn't, and
 what this run never examined.
